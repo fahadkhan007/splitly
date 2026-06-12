@@ -1,0 +1,28 @@
+# ── Submission files (local only, not for GitHub) ────────────────────────────
+AI_CONTEXT.md
+BUILD_PLAN.md
+KEY_PROMPTS.txt
+
+# ── Backend ───────────────────────────────────────────────────────────────────
+backend/.env
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.python-version
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# ── OS / Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
