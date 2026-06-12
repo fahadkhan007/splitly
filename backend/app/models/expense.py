@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,7 +13,14 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
-    from app.models.group import Group, GroupMember
+    from app.models.group import Group
+
+
+class SplitType(str, enum.Enum):
+    equal = "equal"
+    exact = "exact"
+    percentage = "percentage"
+    shares = "shares"
 
 
 class GroupExpense(Base):
@@ -29,6 +37,9 @@ class GroupExpense(Base):
     paid_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    split_type: Mapped[SplitType] = mapped_column(
+        Enum(SplitType), nullable=False, default=SplitType.equal
+    )
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -42,8 +53,8 @@ class GroupExpense(Base):
     )
 
     # Relationships
-    group: Mapped["Group"] = relationship("Group", back_populates="expenses")  # noqa: F821
-    payer: Mapped["User"] = relationship("User", foreign_keys="[GroupExpense.paid_by]") #ignore
+    group: Mapped["Group"] = relationship("Group", back_populates="expenses")
+    payer: Mapped["User"] = relationship("User", foreign_keys="[GroupExpense.paid_by]")
     creator: Mapped["User"] = relationship("User", foreign_keys="[GroupExpense.created_by]")
     participants: Mapped[list["GroupExpenseParticipant"]] = relationship(
         "GroupExpenseParticipant", back_populates="expense", cascade="all, delete-orphan"
@@ -67,13 +78,17 @@ class GroupExpenseParticipant(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    # For percentage: stores the % value (e.g. 40.00)
+    # For shares: stores the share count (e.g. 2)
+    # Null for equal and exact splits
+    share_value: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
     amount_owed: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
 
     # Relationships
     expense: Mapped["GroupExpense"] = relationship(
         "GroupExpense", back_populates="participants"
     )
-    user: Mapped["User"] = relationship("User")  # noqa: F821
+    user: Mapped["User"] = relationship("User")
 
     def __repr__(self) -> str:
         return f"<Participant expense={self.expense_id} user={self.user_id} owes={self.amount_owed}>"
@@ -93,6 +108,11 @@ class DirectExpense(Base):
     owed_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    split_type: Mapped[SplitType] = mapped_column(
+        Enum(SplitType), nullable=False, default=SplitType.equal
+    )
+    # % or share count for the owed_by person; null for equal/exact
+    share_value: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
     amount_owed: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False

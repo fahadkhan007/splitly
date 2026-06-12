@@ -11,35 +11,29 @@ from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
 
-bearer_scheme = HTTPBearer()
+bearer = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
         payload = decode_token(credentials.credentials)
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+        user_id = payload.get("sub")
+        if not user_id:
+            raise ValueError
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    result = await db.execute(select(User).where(User.id == UUID(user_id)))
-    user = result.scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.id == UUID(user_id)))).scalar_one_or_none()
+
     if user is None:
-        raise credentials_exception
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
     if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please verify your email before using Splitly.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Please verify your email first")
+
     return user
 
 
